@@ -10,28 +10,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestMintWIT(t *testing.T) {
-	_, issuer, err := ed25519.GenerateKey(cryptorand.Reader)
-	require.NoError(t, err)
-
-	workloadIdentifier, err := spiffeid.FromString(
-		"spiffe://example.com/my-workload",
-	)
-	require.NoError(t, err)
-
-	wit, err := MintWIT(
-		issuer,
-		time.Now().Add(time.Hour),
-		workloadIdentifier,
-	)
-	require.NoError(t, err)
-	require.NotEmpty(t, wit.Signed)
-
-	// TODO: Parse and validate WIT
-}
-
 func TestMintWPT(t *testing.T) {
-	_, issuer, err := ed25519.GenerateKey(cryptorand.Reader)
+	issuerPub, issuer, err := ed25519.GenerateKey(cryptorand.Reader)
 	require.NoError(t, err)
 
 	workloadIdentifier, err := spiffeid.FromString(
@@ -53,4 +33,9 @@ func TestMintWPT(t *testing.T) {
 	)
 	require.NoError(t, err)
 	require.NotEmpty(t, wpt.Signed)
+
+	gotWIT, gotWPT, err := ValidateWPT(issuerPub, wit.Signed, wpt.Signed)
+	require.NoError(t, err)
+	require.NotEmpty(t, gotWIT)
+	require.NotEmpty(t, gotWPT)
 }
