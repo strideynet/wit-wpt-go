@@ -174,7 +174,6 @@ func ValidateWPT(
 	if typ := parsedWIT.Headers[0]; typ.ExtraHeaders[jose.HeaderType] != witJWTType {
 		return nil, nil, fmt.Errorf("invalid WIT JWT: expected type %v, got %v", witJWTType, typ)
 	}
-	// TODO: Check header type is as expected...
 
 	// Now we can check the WPT is signed by the public key within the WIT.
 	parsedWPT, err := jwt.ParseSigned(rawWPT, []jose.SignatureAlgorithm{
@@ -194,6 +193,7 @@ func ValidateWPT(
 	if typ := parsedWPT.Headers[0]; typ.ExtraHeaders[jose.HeaderType] != wptJWTType {
 		return nil, nil, fmt.Errorf("invalid WPT JWT: expected type %v, got %v", wptJWTType, typ)
 	}
+	// TODO: Check WTH
 
 	return wit, wpt, nil
 }
