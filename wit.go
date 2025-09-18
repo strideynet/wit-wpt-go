@@ -99,6 +99,7 @@ type WPT struct {
 	Signed string `json:"-"`
 }
 
+// TODO: ATH etc as func opts
 func MintWPT(
 	wit *WIT,
 	audience string,
