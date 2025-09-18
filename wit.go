@@ -60,6 +60,7 @@ func MintWIT(
 	if err != nil {
 		return nil, fmt.Errorf("generating WIT keypair: %w", err)
 	}
+	// TODO: JTI
 	wit := &WIT{
 		ID:         id,
 		PrivateKey: witPrivKey,
@@ -123,6 +124,7 @@ func MintWPT(
 		return nil, fmt.Errorf("creating WPT signer: %w", err)
 	}
 
+	// TODO: JTI
 	wth := base64UrlEncTokenHash(wit.Signed)
 	wpt := &WPT{
 		Audience: audience,
