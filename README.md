@@ -10,3 +10,6 @@ As per https://datatracker.ietf.org/doc/draft-ietf-wimse-s2s-protocol/
 
 It should go without saying that this code is currently not production ready
 and is mostly hacked together :')
+
+See the tests in the `transport` packages for example of usage for specific
+protocols
