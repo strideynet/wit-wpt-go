@@ -14,7 +14,7 @@ func TestMintWIT(t *testing.T) {
 	_, issuer, err := ed25519.GenerateKey(cryptorand.Reader)
 	require.NoError(t, err)
 
-	workloadIdentitier, err := spiffeid.FromString(
+	workloadIdentifier, err := spiffeid.FromString(
 		"spiffe://example.com/my-workload",
 	)
 	require.NoError(t, err)
@@ -22,8 +22,35 @@ func TestMintWIT(t *testing.T) {
 	wit, err := MintWIT(
 		issuer,
 		time.Now().Add(time.Hour),
-		workloadIdentitier,
+		workloadIdentifier,
 	)
 	require.NoError(t, err)
 	require.NotEmpty(t, wit.Signed)
+
+	// TODO: Parse and validate WIT
+}
+
+func TestMintWPT(t *testing.T) {
+	_, issuer, err := ed25519.GenerateKey(cryptorand.Reader)
+	require.NoError(t, err)
+
+	workloadIdentifier, err := spiffeid.FromString(
+		"spiffe://example.com/my-workload",
+	)
+	require.NoError(t, err)
+
+	wit, err := MintWIT(
+		issuer,
+		time.Now().Add(time.Hour),
+		workloadIdentifier,
+	)
+	require.NoError(t, err)
+
+	wpt, err := MintWPT(
+		wit,
+		"https://app.example.com",
+		time.Now().Add(time.Minute*5),
+	)
+	require.NoError(t, err)
+	require.NotEmpty(t, wpt.Signed)
 }

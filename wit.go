@@ -121,14 +121,10 @@ func MintWPT(
 		return nil, fmt.Errorf("creating WPT signer: %w", err)
 	}
 
-	wth, err := base64UrlEncTokenHash(wit.Signed)
-	if err != nil {
-		return nil, fmt.Errorf("producing wth: %w", err)
-	}
-
+	wth := base64UrlEncTokenHash(wit.Signed)
 	wpt := &WPT{
 		Audience: audience,
-		WTH:      "foobar...",
+		WTH:      wth,
 		Expiry:   expiresAt,
 	}
 	signed, err := jwt.Signed(signer).Claims(wpt).Serialize()
