@@ -28,8 +28,11 @@ func TestMintWPT(t *testing.T) {
 
 	wpt, err := MintWPT(
 		wit,
-		"https://app.example.com",
-		time.Now().Add(time.Minute*5),
+		WithAudience("https://app.example.com"),
+		WithExpiry(time.Now().Add(time.Minute)),
+		WithAccessToken("foobaraccesstoken"),
+		WithTransactionToken("foobartxtoken"),
+		WithOtherToken("foobarothertoken"),
 	)
 	require.NoError(t, err)
 	require.NotEmpty(t, wpt.Signed)
