@@ -1,2 +1,9 @@
 # wit-wpt-go
-Experimental WIMSE WIT/WPT &amp; SPIFFE support in Go
+
+Experimental WIMSE WIT/WPT & SPIFFE support in Go along with examples of WPT
+usage on various protocols.
+
+Much of the functionality here may eventually end up merged into
+`spiffe/go-spiffe`.
+
+As per https://datatracker.ietf.org/doc/draft-ietf-wimse-s2s-protocol/
