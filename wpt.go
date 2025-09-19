@@ -152,7 +152,7 @@ func ValidateWPT(
 		return nil, nil, fmt.Errorf("parsing WPT JWT: %w", err)
 	}
 	wpt := &WPT{}
-	if err := parsedWPT.Claims(wit.PublicKey, wpt); err != nil {
+	if err := parsedWPT.Claims(wit.PublicKey.JWK, wpt); err != nil {
 		return nil, nil, fmt.Errorf("validating WPT JWT: %w", err)
 	}
 	if len(parsedWPT.Headers) != 1 {
@@ -161,7 +161,10 @@ func ValidateWPT(
 	if typ := parsedWPT.Headers[0]; typ.ExtraHeaders[jose.HeaderType] != wptJWTType {
 		return nil, nil, fmt.Errorf("invalid WPT JWT: expected type %v, got %v", wptJWTType, typ)
 	}
-	// TODO: Check WTH
+	// Check the WTH claim of the WPT matches the WIT
+	if wpt.WTH != base64SHA256(rawWIT) {
+		return nil, nil, fmt.Errorf("WPT WTH claim does not match WIT")
+	}
 
 	return wit, wpt, nil
 }

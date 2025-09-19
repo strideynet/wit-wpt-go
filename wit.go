@@ -25,13 +25,15 @@ const (
 type WIT struct {
 	// ID is the SPIFFE ID of the WIT-SVID
 	ID spiffeid.ID `json:"sub"`
-	// PrivateKey is the private key for the WIT-SVID.
+	// PrivateKey is the private key for the WIT-SVID. It will be used to sign
+	// WPTs by the workload.
 	// This will only be present for a "local" SVID (e.g. one that the workload
 	// possesses)
 	PrivateKey ed25519.PrivateKey `json:"-"`
-	// TODO: probably need some custom stuff here to marshal this as expected.
-	// TODO: Embed cnf a layer deeper :')
-	PublicKey jose.JSONWebKey `json:"cnf"`
+	// PublicKey is the bound public key for the WIT-SVID. It is the public part
+	// of the keypair possessed by the workload and which will be used to
+	// validate WPT signed by the workload.
+	PublicKey CNFClaim `json:"cnf"`
 	// Hint is an operator-specified string used to provide guidance on how this
 	// identity should be used by a workload when more than one SVID is returned.
 	Hint string `json:"-"`
@@ -45,6 +47,10 @@ type WIT struct {
 
 	// Signed is this WIT, but signed.
 	Signed string `json:"-"`
+}
+
+type CNFClaim struct {
+	JWK jose.JSONWebKey `json:"jwk"`
 }
 
 // TODO: yoink this into a "fakeissuer" package.
@@ -65,9 +71,11 @@ func MintWIT(
 	wit := &WIT{
 		ID:         id,
 		PrivateKey: witPrivKey,
-		PublicKey: jose.JSONWebKey{
-			Key:       witPubKey,
-			Algorithm: string(jose.EdDSA),
+		PublicKey: CNFClaim{
+			JWK: jose.JSONWebKey{
+				Key:       witPubKey,
+				Algorithm: string(jose.EdDSA),
+			},
 		},
 		Expiry:   exp,
 		IssuedAt: time.Now(),
