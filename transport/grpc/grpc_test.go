@@ -31,12 +31,14 @@ func TestGRPC(t *testing.T) {
 		wg.Wait()
 	})
 
-	clientCred := &WPTRPCCredential{
-		WITSource: func(ctx context.Context) (*wit_wpt_go.WIT, error) {
-			// TODO: Return a WIT
-			return nil, fmt.Errorf("unimplemented")
-		},
+	witSource := func(ctx context.Context) (*wit_wpt_go.WIT, error) {
+		return nil, fmt.Errorf("unimplemented")
 	}
+
+	clientCred := NewWPTRPCCredential(
+		witSource,
+		"https://example.com",
+	)
 	conn, err := grpc.NewClient(
 		"TODO",
 		grpc.WithPerRPCCredentials(clientCred),
