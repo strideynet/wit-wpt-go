@@ -37,7 +37,7 @@ type WPTOption func(*wptOptions)
 
 func WithAccessToken(tok string) WPTOption {
 	return func(o *wptOptions) {
-		o.ath = base64UrlEncTokenHash(tok)
+		o.ath = base64SHA256(tok)
 	}
 }
 
@@ -55,13 +55,13 @@ func WithExpiry(expiresAt time.Time) WPTOption {
 
 func WithTransactionToken(tok string) WPTOption {
 	return func(o *wptOptions) {
-		o.tth = base64UrlEncTokenHash(tok)
+		o.tth = base64SHA256(tok)
 	}
 }
 
 func WithOtherToken(tok string) WPTOption {
 	return func(o *wptOptions) {
-		o.oth = base64UrlEncTokenHash(tok)
+		o.oth = base64SHA256(tok)
 	}
 }
 
@@ -93,7 +93,7 @@ func MintWPT(
 		return nil, fmt.Errorf("creating WPT signer: %w", err)
 	}
 
-	wth := base64UrlEncTokenHash(wit.Signed)
+	wth := base64SHA256(wit.Signed)
 	jti, err := generateJTI()
 	if err != nil {
 		return nil, fmt.Errorf("generating WPT JTI: %w", err)

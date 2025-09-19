@@ -6,6 +6,8 @@ require (
 	github.com/go-jose/go-jose/v4 v4.1.2
 	github.com/spiffe/go-spiffe/v2 v2.6.0
 	github.com/stretchr/testify v1.10.0
+	google.golang.org/grpc v1.75.1
+	google.golang.org/grpc/examples v0.0.0-20250407062114-b368379ef8f6
 )
 
 require (
@@ -17,7 +19,6 @@ require (
 	golang.org/x/sys v0.33.0 // indirect
 	golang.org/x/text v0.26.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250707201910-8d1bb00bc6a7 // indirect
-	google.golang.org/grpc v1.75.1 // indirect
 	google.golang.org/protobuf v1.36.7 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )

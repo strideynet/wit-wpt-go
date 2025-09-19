@@ -15,10 +15,11 @@ func generateJTI() (string, error) {
 	return base64.RawURLEncoding.EncodeToString(b), nil
 }
 
-// base64UrlEncTokenHash calculates the SHA-256 hash of the input string.
+// base64SHA256 calculates the SHA-256 hash of the input string and encodes it
+// using base64 URL encoding.
 // This is mandated by the W2W spec to be used for the ATH, TTH, OTH and WTH
 // claims.
-func base64UrlEncTokenHash(raw string) string {
+func base64SHA256(raw string) string {
 	if raw == "" {
 		return ""
 	}

@@ -14,8 +14,8 @@ import (
 )
 
 const (
-	witMetadataKey = "Workload-Identity-Token"
-	wptMetadataKey = "Workload-Proof-Token"
+	witMetadataKey = "workload-identity-token"
+	wptMetadataKey = "workload-proof-token"
 )
 
 type WITSource func(ctx context.Context) (*wit_wpt_go.WIT, error)
@@ -47,7 +47,7 @@ func (c *WPTRPCCredential) GetRequestMetadata(ctx context.Context, uri ...string
 		wit_wpt_go.WithAudience(c.audience),
 	)
 	if err != nil {
-		return nil, fmt.Errorf("minting WPT: %w")
+		return nil, fmt.Errorf("minting WPT: %w", err)
 	}
 
 	return map[string]string{
@@ -80,17 +80,33 @@ func NewWITAuthInterceptor(
 	}
 }
 
+type wrappedServerStream struct {
+	grpc.ServerStream
+	ctx context.Context
+}
+
+func (w *wrappedServerStream) Context() context.Context {
+	return w.ctx
+}
+
 func (i *WITAuthInterceptor) StreamInterceptor(
 	srv any,
 	ss grpc.ServerStream,
 	info *grpc.StreamServerInfo,
 	handler grpc.StreamHandler,
 ) error {
-	if err := i.extractAndValidate(ss.Context()); err != nil {
+	id, err := i.extractAndValidate(ss.Context())
+	if err != nil {
 		return fmt.Errorf("extracting and validating wit/wpt: %w", err)
 	}
 
-	return handler(srv, ss)
+	ctx := contextWithIdentity(ss.Context(), id)
+	wrapped := &wrappedServerStream{
+		ServerStream: ss,
+		ctx:          ctx,
+	}
+
+	return handler(wrapped, ss)
 }
 
 func (i *WITAuthInterceptor) UnaryInterceptor(
@@ -99,26 +115,76 @@ func (i *WITAuthInterceptor) UnaryInterceptor(
 	info *grpc.UnaryServerInfo,
 	handler grpc.UnaryHandler,
 ) (any, error) {
-	if err := i.extractAndValidate(ctx); err != nil {
+	id, err := i.extractAndValidate(ctx)
+	if err != nil {
 		return nil, fmt.Errorf("extracting and validating wit/wpt: %w", err)
 	}
 
+	ctx = contextWithIdentity(ctx, id)
 	return handler(ctx, req)
 }
 
-func (i *WITAuthInterceptor) extractAndValidate(ctx context.Context) error {
+func (i *WITAuthInterceptor) extractAndValidate(ctx context.Context) (string, error) {
 	md, ok := metadata.FromIncomingContext(ctx)
 	if !ok {
-		return status.Error(codes.InvalidArgument, "missing metadata")
+		return "", status.Error(codes.InvalidArgument, "missing metadata")
 	}
 
 	witToken := md[witMetadataKey]
 	if len(witToken) != 1 {
-		return fmt.Errorf("expected one workload-identity-token header, got %d", len(witToken))
+		return "", status.Errorf(
+			codes.Unauthenticated,
+			"expected one workload-identity-token header, got %d",
+			len(witToken),
+		)
 	}
 	wptToken := md[wptMetadataKey]
 	if len(wptToken) != 1 {
-		return fmt.Errorf("expected one workload-proof-token header, got %d", len(wptToken))
+		return "", status.Errorf(
+			codes.Unauthenticated,
+			"expected one workload-proof-token header, got %d",
+			len(wptToken),
+		)
 	}
-	return nil
+
+	wit, wpt, err := wit_wpt_go.ValidateWPT(
+		i.issuer,
+		witToken[0],
+		wptToken[0],
+	)
+	if err != nil {
+		return "", status.Errorf(
+			codes.Unauthenticated, "validating WIT/WPT: %v", err,
+		)
+	}
+	// Validate audience is as expected.
+	// TODO: It'd be nice if this was "core" functionality exposed by a
+	// ValidateWPT func option? or similar? Mostly to avoid this being forgotten
+	// and being a huge security footgun.
+	if wpt.Audience != i.wantAudience {
+		return "", status.Errorf(
+			codes.Unauthenticated,
+			"unexpected WPT audience %q, wanted %q",
+			wpt.Audience,
+			i.wantAudience,
+		)
+	}
+
+	return wit.ID.String(), nil
+}
+
+type identityContextKey struct{}
+
+func contextWithIdentity(
+	ctx context.Context, workloadIdentifier string,
+) context.Context {
+	// TODO: In an ideal world, we'd use a more structured type here so we can
+	// indicate information such as the JTI of the WIT and WPT. But this does
+	// fine for demonstrative purposes.
+	return context.WithValue(ctx, identityContextKey{}, workloadIdentifier)
+}
+
+func IdentityFromContext(ctx context.Context) (string, bool) {
+	id, ok := ctx.Value(identityContextKey{}).(string)
+	return id, ok
 }
