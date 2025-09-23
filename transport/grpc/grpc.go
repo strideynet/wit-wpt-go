@@ -24,6 +24,14 @@ const (
 // WIT to use for minting WPTs.
 type WITSource func(ctx context.Context) (*wit_wpt_go.WIT, error)
 
+// StaticWITSource returns a WITSource which always returns the same, initially
+// provided WIT.
+func StaticWITSource(wit *wit_wpt_go.WIT) WITSource {
+	return func(_ context.Context) (*wit_wpt_go.WIT, error) {
+		return wit, nil
+	}
+}
+
 type WPTRPCCredential struct {
 	witSource WITSource
 	audSource ClientAudSource
@@ -88,17 +96,26 @@ func (c *WPTRPCCredential) RequireTransportSecurity() bool {
 // generate the correct audience for the WPT based on the request.
 type ClientAudSource func(url *url.URL, reqInfo credentials.RequestInfo) string
 
-var DefaultClientAudSource ClientAudSource = func(
-	in *url.URL,
-	reqInfo credentials.RequestInfo,
-) string {
-	// Produces: "service.example.com/some.Service/Method
-	out := url.URL{
-		Scheme: "https", // TODO: Actually determine this?
-		Host:   in.Host,
-		Path:   reqInfo.Method,
+// DefaultClientAudSource returns a ClientAudSource which constructs the
+// audience using the target URI, e.g:
+// service.example.com/some.Service/Method
+func DefaultClientAudSource() ClientAudSource {
+	return func(in *url.URL, reqInfo credentials.RequestInfo) string {
+		out := url.URL{
+			Scheme: "https", // TODO: Actually determine this?
+			Host:   in.Host,
+			Path:   reqInfo.Method,
+		}
+		return out.String()
 	}
-	return out.String()
+}
+
+// StaticClientAudSource returns a ClientAudSource which always returns the
+// same static audience string.
+func StaticClientAudSource(aud string) ClientAudSource {
+	return func(_ *url.URL, _ credentials.RequestInfo) string {
+		return aud
+	}
 }
 
 // ServerAudSource is a function used by the server-side interceptor to

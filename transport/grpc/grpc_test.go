@@ -126,10 +126,8 @@ func TestGRPC(t *testing.T) {
 	)
 	require.NoError(t, err)
 	clientCred := NewWPTRPCCredential(
-		func(ctx context.Context) (*wit_wpt_go.WIT, error) {
-			return clientWIT, nil
-		},
-		DefaultClientAudSource,
+		StaticWITSource(clientWIT),
+		DefaultClientAudSource(),
 	)
 	conn, err := grpc.NewClient(
 		lis.Addr().String(),
