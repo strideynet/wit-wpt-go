@@ -40,6 +40,12 @@ func NewWPTRPCCredential(
 }
 
 func (c *WPTRPCCredential) GetRequestMetadata(ctx context.Context, uri ...string) (map[string]string, error) {
+	// Note: weirdly the URI passed in here looks something like:
+	// https://service.example.com/some.Service
+	// and omits the method being invoked. So this is not actually the target
+	// URI being used in the underlying HTTP/2 transport. Hence, we need to use
+	// the hostport from the URI and then use the RequestInfo to determine the
+	// actual service/method being invoked.
 	wit, err := c.witSource(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("getting WIT: %w", err)
@@ -88,8 +94,9 @@ var DefaultClientAudSource ClientAudSource = func(
 ) string {
 	// Produces: "service.example.com/some.Service/Method
 	out := url.URL{
-		Host: in.Host,
-		Path: reqInfo.Method,
+		Scheme: "https", // TODO: Actually determine this?
+		Host:   in.Host,
+		Path:   reqInfo.Method,
 	}
 	return out.String()
 }
@@ -108,8 +115,9 @@ var DefaultServerAudSource = func(
 ) ServerAudSource {
 	return func(fullMethod string) string {
 		out := url.URL{
-			Host: hostPort,
-			Path: fullMethod,
+			Scheme: "https", // TODO: Actually determine this?
+			Host:   hostPort,
+			Path:   fullMethod,
 		}
 		return out.String()
 	}
