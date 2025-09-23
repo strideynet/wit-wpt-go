@@ -86,9 +86,7 @@ func serverSetup(
 
 	witAuthInterceptor := NewWITAuthInterceptor(
 		issuerPub,
-		// TODO: Similar remarks in terms of automagically determining the
-		// expected audience as I've made elsewhere.
-		"spiffe://example.com/echo",
+		DefaultServerAudSource(lis.Addr().String()),
 	)
 
 	srv := grpc.NewServer(
@@ -131,7 +129,7 @@ func TestGRPC(t *testing.T) {
 		func(ctx context.Context) (*wit_wpt_go.WIT, error) {
 			return clientWIT, nil
 		},
-		"spiffe://example.com/echo",
+		DefaultClientAudSource,
 	)
 	conn, err := grpc.NewClient(
 		lis.Addr().String(),

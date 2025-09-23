@@ -4,11 +4,13 @@ import (
 	"context"
 	"crypto/ed25519"
 	"fmt"
+	"net/url"
 	"time"
 
 	wit_wpt_go "github.com/strideynet/wit-wpt-go"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 )
@@ -18,20 +20,22 @@ const (
 	wptMetadataKey = "workload-proof-token"
 )
 
+// WITSource is a function used by the client-side RPCCredential to fetch the
+// WIT to use for minting WPTs.
 type WITSource func(ctx context.Context) (*wit_wpt_go.WIT, error)
 
 type WPTRPCCredential struct {
 	witSource WITSource
-	audience  string
+	audSource ClientAudSource
 }
 
 func NewWPTRPCCredential(
 	source WITSource,
-	audience string,
+	audSource ClientAudSource,
 ) *WPTRPCCredential {
 	return &WPTRPCCredential{
 		witSource: source,
-		audience:  audience,
+		audSource: audSource,
 	}
 }
 
@@ -41,10 +45,20 @@ func (c *WPTRPCCredential) GetRequestMetadata(ctx context.Context, uri ...string
 		return nil, fmt.Errorf("getting WIT: %w", err)
 	}
 
+	reqInfo, ok := credentials.RequestInfoFromContext(ctx)
+	if !ok {
+		return nil, fmt.Errorf("missing request info in context")
+	}
+	parsedURI, err := url.Parse(uri[0])
+	if err != nil {
+		return nil, fmt.Errorf("parsing URI %q: %w", parsedURI, err)
+	}
+	aud := c.audSource(parsedURI, reqInfo)
+
 	wpt, err := wit_wpt_go.MintWPT(
 		wit,
 		wit_wpt_go.WithExpiry(time.Now().Add(1*time.Minute)),
-		wit_wpt_go.WithAudience(c.audience),
+		wit_wpt_go.WithAudience(aud),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("minting WPT: %w", err)
@@ -64,19 +78,56 @@ func (c *WPTRPCCredential) RequireTransportSecurity() bool {
 	return false
 }
 
+// ClientAudSource is a function used by the client-side RPCCredential to
+// generate the correct audience for the WPT based on the request.
+type ClientAudSource func(url *url.URL, reqInfo credentials.RequestInfo) string
+
+var DefaultClientAudSource ClientAudSource = func(
+	in *url.URL,
+	reqInfo credentials.RequestInfo,
+) string {
+	// Produces: "service.example.com/some.Service/Method
+	out := url.URL{
+		Host: in.Host,
+		Path: reqInfo.Method,
+	}
+	return out.String()
+}
+
+// ServerAudSource is a function used by the server-side interceptor to
+// determine the expected audience for incoming WPTs.
+//
+// TODO: Ideally, we'd modify this so it checks an incoming aud. A "AudChecker"
+// as opposed to an "AudSource". This would allow support for a model where the
+// server expects one of a list of valid audiences which can be fairly common
+// if the server has multiple identities or is exposed by multiple DNS names.
+type ServerAudSource func(fullMethod string) string
+
+var DefaultServerAudSource = func(
+	hostPort string,
+) ServerAudSource {
+	return func(fullMethod string) string {
+		out := url.URL{
+			Host: hostPort,
+			Path: fullMethod,
+		}
+		return out.String()
+	}
+}
+
 type WITAuthInterceptor struct {
 	// TODO: take this as a more "generic" trust bundle.
-	issuer       ed25519.PublicKey
-	wantAudience string
+	issuer    ed25519.PublicKey
+	audSource ServerAudSource
 }
 
 func NewWITAuthInterceptor(
 	issuer ed25519.PublicKey,
-	wantAudience string,
+	audSource ServerAudSource,
 ) *WITAuthInterceptor {
 	return &WITAuthInterceptor{
-		issuer:       issuer,
-		wantAudience: wantAudience,
+		issuer:    issuer,
+		audSource: audSource,
 	}
 }
 
@@ -95,7 +146,7 @@ func (i *WITAuthInterceptor) StreamInterceptor(
 	info *grpc.StreamServerInfo,
 	handler grpc.StreamHandler,
 ) error {
-	id, err := i.extractAndValidate(ss.Context())
+	id, err := i.extractAndValidate(ss.Context(), info.FullMethod)
 	if err != nil {
 		return fmt.Errorf("extracting and validating wit/wpt: %w", err)
 	}
@@ -115,7 +166,7 @@ func (i *WITAuthInterceptor) UnaryInterceptor(
 	info *grpc.UnaryServerInfo,
 	handler grpc.UnaryHandler,
 ) (any, error) {
-	id, err := i.extractAndValidate(ctx)
+	id, err := i.extractAndValidate(ctx, info.FullMethod)
 	if err != nil {
 		return nil, fmt.Errorf("extracting and validating wit/wpt: %w", err)
 	}
@@ -124,7 +175,9 @@ func (i *WITAuthInterceptor) UnaryInterceptor(
 	return handler(ctx, req)
 }
 
-func (i *WITAuthInterceptor) extractAndValidate(ctx context.Context) (string, error) {
+func (i *WITAuthInterceptor) extractAndValidate(
+	ctx context.Context, fullMethod string,
+) (string, error) {
 	md, ok := metadata.FromIncomingContext(ctx)
 	if !ok {
 		return "", status.Error(codes.InvalidArgument, "missing metadata")
@@ -161,12 +214,13 @@ func (i *WITAuthInterceptor) extractAndValidate(ctx context.Context) (string, er
 	// TODO: It'd be nice if this was "core" functionality exposed by a
 	// ValidateWPT func option? or similar? Mostly to avoid this being forgotten
 	// and being a huge security footgun.
-	if wpt.Audience != i.wantAudience {
+	wantAud := i.audSource(fullMethod)
+	if wpt.Audience != wantAud {
 		return "", status.Errorf(
 			codes.Unauthenticated,
 			"unexpected WPT audience %q, wanted %q",
 			wpt.Audience,
-			i.wantAudience,
+			wantAud,
 		)
 	}
 
