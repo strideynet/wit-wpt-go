@@ -1,6 +1,7 @@
 package wit_wpt_go
 
 import (
+	"crypto/ecdsa"
 	"crypto/ed25519"
 	cryptorand "crypto/rand"
 	"fmt"
@@ -12,7 +13,7 @@ import (
 )
 
 const (
-	witJWTType = "wimse-id+jwt"
+	witJWTType = "wit+jwt"
 )
 
 // WIT
@@ -39,9 +40,9 @@ type WIT struct {
 	Hint string `json:"-"`
 	// Expiry is the expiration time of the WIT-SVID as present in the `exp`
 	// claim.
-	Expiry time.Time `json:"exp"`
+	Expiry *jwt.NumericDate `json:"exp"`
 	// IssuedAt is the time that the WIT-SVID was issued as in the `iat` claim.
-	IssuedAt time.Time `json:"iat"`
+	IssuedAt *jwt.NumericDate `json:"iat"`
 	// JTI is...
 	JTI string `json:"jti"`
 
@@ -55,7 +56,7 @@ type CNFClaim struct {
 
 // TODO: yoink this into a "fakeissuer" package.
 func MintWIT(
-	issuer ed25519.PrivateKey,
+	issuer *ecdsa.PrivateKey,
 	exp time.Time,
 	id spiffeid.ID,
 ) (*WIT, error) {
@@ -77,8 +78,8 @@ func MintWIT(
 				Algorithm: string(jose.EdDSA),
 			},
 		},
-		Expiry:   exp,
-		IssuedAt: time.Now(),
+		Expiry:   jwt.NewNumericDate(exp),
+		IssuedAt: jwt.NewNumericDate(time.Now()),
 		JTI:      jti,
 	}
 
@@ -86,7 +87,7 @@ func MintWIT(
 	signerOpts.WithType(witJWTType)
 	signer, err := jose.NewSigner(jose.SigningKey{
 		Key:       issuer,
-		Algorithm: jose.EdDSA,
+		Algorithm: jose.ES256,
 	}, signerOpts)
 	if err != nil {
 		return nil, fmt.Errorf("creating WIT signer: %w", err)

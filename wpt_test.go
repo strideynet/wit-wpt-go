@@ -1,7 +1,8 @@
 package wit_wpt_go
 
 import (
-	"crypto/ed25519"
+	"crypto/ecdsa"
+	"crypto/elliptic"
 	cryptorand "crypto/rand"
 	"testing"
 	"time"
@@ -11,8 +12,9 @@ import (
 )
 
 func TestMintWPT(t *testing.T) {
-	issuerPub, issuer, err := ed25519.GenerateKey(cryptorand.Reader)
+	issuer, err := ecdsa.GenerateKey(elliptic.P256(), cryptorand.Reader)
 	require.NoError(t, err)
+	issuerPub := issuer.Public()
 
 	workloadIdentifier, err := spiffeid.FromString(
 		"spiffe://example.com/my-workload",

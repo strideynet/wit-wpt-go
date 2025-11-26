@@ -1,7 +1,7 @@
 package wit_wpt_go
 
 import (
-	"crypto/ed25519"
+	"crypto"
 	"fmt"
 	"time"
 
@@ -121,14 +121,14 @@ func MintWPT(
 // things like the `aud` are as we expect, or, we can bundle that into this as
 // functional opts.
 func ValidateWPT(
-	issuer ed25519.PublicKey,
+	issuer crypto.PublicKey,
 	rawWIT string,
 	rawWPT string,
 ) (*WIT, *WPT, error) {
 	// First, we need to validate the WIT is signed by the issuer, and also
 	// validate that none of the claims within the WIT have been violated
 	// (e.g it has expired)...
-	parsedWIT, err := jwt.ParseSigned(rawWIT, []jose.SignatureAlgorithm{jose.EdDSA})
+	parsedWIT, err := jwt.ParseSigned(rawWIT, []jose.SignatureAlgorithm{jose.ES256})
 	if err != nil {
 		return nil, nil, fmt.Errorf("parsing WIT JWT: %w", err)
 	}
