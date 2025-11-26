@@ -2,7 +2,7 @@ package wit_wpt_go
 
 import (
 	"crypto/ecdsa"
-	"crypto/ed25519"
+	"crypto/elliptic"
 	cryptorand "crypto/rand"
 	"fmt"
 	"time"
@@ -30,7 +30,7 @@ type WIT struct {
 	// WPTs by the workload.
 	// This will only be present for a "local" SVID (e.g. one that the workload
 	// possesses)
-	PrivateKey ed25519.PrivateKey `json:"-"`
+	PrivateKey *ecdsa.PrivateKey `json:"-"`
 	// PublicKey is the bound public key for the WIT-SVID. It is the public part
 	// of the keypair possessed by the workload and which will be used to
 	// validate WPT signed by the workload.
@@ -60,10 +60,11 @@ func MintWIT(
 	exp time.Time,
 	id spiffeid.ID,
 ) (*WIT, error) {
-	witPubKey, witPrivKey, err := ed25519.GenerateKey(cryptorand.Reader)
+	witPrivKey, err := ecdsa.GenerateKey(elliptic.P256(), cryptorand.Reader)
 	if err != nil {
 		return nil, fmt.Errorf("generating WIT keypair: %w", err)
 	}
+	witPubKey := witPrivKey.Public()
 
 	jti, err := generateJTI()
 	if err != nil {
@@ -75,7 +76,7 @@ func MintWIT(
 		PublicKey: CNFClaim{
 			JWK: jose.JSONWebKey{
 				Key:       witPubKey,
-				Algorithm: string(jose.EdDSA),
+				Algorithm: string(jose.ES256),
 			},
 		},
 		Expiry:   jwt.NewNumericDate(exp),
